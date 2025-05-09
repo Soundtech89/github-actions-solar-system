@@ -13,8 +13,6 @@ env:
 
 jobs:
     unit-testing:
-        permissions:
-          packages: write
         name: Unit Testing
         runs-on: ubuntu-latest
         steps:
@@ -72,6 +70,9 @@ jobs:
             retention-days: 5
 
     docker:
+      name: Docker steps
+      permissions:
+        packages: write
       needs:
         - code-coverage
         - unit-testing
