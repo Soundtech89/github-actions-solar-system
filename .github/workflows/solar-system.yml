@@ -10,9 +10,9 @@ env:
   MONGO_URI: 'mongodb+srv://supercluster.d83jj.mongodb.net/superData'
   MONGO_USERNAME: superuser
   MONGO_PASSWORD: ${{ secrets.MONGO_PASSWORD }}
-
+    
 jobs:
-    unit-testing:
+  unit-testing:
         name: Unit Testing
         runs-on: ubuntu-latest
         container:
@@ -25,7 +25,7 @@ jobs:
         #   uses: actions/setup-node@v4
         #   with:
         #     node-version: 20
-    
+
         - name: Cache NPM dependencies
           uses: actions/cache@v4
           with:
@@ -44,55 +44,115 @@ jobs:
           with:
             name: Mocha-Test-Result
             path: test-results.xml
+  
+  code-coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
 
-    code-coverage:
-      name: Code Coverage
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout Repo
-          uses: actions/checkout@v4
-        
-        - name: Setup NodeJS Version - 18
-          uses: actions/setup-node@v3
-          with:
-            node-version: 18
+      - name: Setup NodeJS Version - 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
 
-        - name: Install Dependencies
-          run: npm install
+      - name: Install Dependencies
+        run: npm install
 
-        - name: Check Code Coverage
-          continue-on-error: true
-          run: npm run coverage
+      - name: Check Code Coverage
+        continue-on-error: true
+        run: npm run coverage
 
-        - name: Archive Test Results
-          uses: actions/upload-artifact@v4
-          with:
-            name: Code-Coverage-Results
-            path: coverage
-            retention-days: 5
+      - name: Archive Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Code-Coverage-Results
+          path: coverage
+          retention-days: 5
 
-    docker:
-      name: Docker steps
-      permissions:
-        packages: write
-      needs:
-        - code-coverage
-        - unit-testing
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout repo
-          uses: actions/checkout@v4
+  docker:
+    name: Docker steps
+    permissions:
+      packages: write
+    needs:
+      - code-coverage
+      - unit-testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-        - name: Docker Login
-          uses: docker/login-action@v2
-          with:
-            registry: ghcr.io
-            username: "Soundtech89"
-            password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker Login
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: "Soundtech89"
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: 'ghcr.io/${{ github.repository_owner }}/solar-system:${{ github.sha }}'
 
-        - name: Docker Build and Push
-          uses: docker/build-push-action@v6
-          with:
-            context: .
-            push: true
-            tags: 'ghcr.io/${{ github.repository_owner }}/solar-system:${{ github.sha }}'
+  dev-deploy:
+    if: contains(github.ref, 'feature/')
+    needs: docker
+    uses: ./.github/workflows/reuse-deployment.yml
+    secrets:
+      k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+      mongo-password: ${{ secrets.MONGO_PASSWORD}}
+    with:
+      mongo-url: ${{ vars.MONGO_URI }}
+      environment: development
+      k8s-manifests-dir: kubernetes/development 
+  
+  integration-test:
+    needs: dev-deploy
+    uses: ./.github/workflows/reusable-workflow.yml
+    with:
+      ingress-url: ${{ needs.dev-deploy.outputs.APP_INGRESS_URL }}
+
+  # dev-integration-testing:
+  #   name: Dev Integration Testing
+  #   needs: dev-deploy
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Test URL Output using Curl and JQ
+  #       env:
+  #         URL: ${{needs.dev-deploy.outputs.application-url}}
+  #       run: |
+  #         echo $URL
+  #         echo "-------------------------------------------"
+  #         curl https://$URL/live -s -k | jq -r .status | grep - live
+
+  # prod-deploy:
+  #   if: github.ref == 'refs/heads/main'
+  #   needs: docker 
+  #   uses: ./.github/workflows/reuse-deployment.yml
+  #   secrets:
+  #     k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+  #     mongo-password: ${{ secrets.MONGO_PASSWORD}}
+  #   with:
+  #     mongo-url: ${{ vars.MONGO_URI }}
+  #     environment: production
+  #     k8s-manifests-dir: kubernetes/production
+
+
+  # prod-integration-testing:
+  #   name: PROD Integration Testing
+  #   needs: prod-deploy
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Test URL Output using Curl and JQ
+  #       env:
+  #         URL: ${{needs.prod-deploy.outputs.application-url}}
+  #       run: |
+  #         echo $URL
+  #         echo "-------------------------------------------"
+  #         curl https://$URL/live -s -k | jq -r .status | grep - live
+
+
+  
