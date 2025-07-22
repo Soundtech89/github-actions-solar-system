@@ -21,10 +21,10 @@ jobs:
         - name: Checkout Repository
           uses: actions/checkout@v4
 
-        # - name: Setup NodeJS Version
-        #   uses: actions/setup-node@v4
-        #   with:
-        #     node-version: 20
+        - name: Setup NodeJS Version
+          uses: actions/setup-node@v4
+          with:
+            node-version: 20
 
         - name: Cache NPM dependencies
           uses: actions/cache@v4
@@ -115,44 +115,44 @@ jobs:
     with:
       ingress-url: ${{ needs.dev-deploy.outputs.APP_INGRESS_URL }}
 
-  # dev-integration-testing:
-  #   name: Dev Integration Testing
-  #   needs: dev-deploy
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Test URL Output using Curl and JQ
-  #       env:
-  #         URL: ${{needs.dev-deploy.outputs.application-url}}
-  #       run: |
-  #         echo $URL
-  #         echo "-------------------------------------------"
-  #         curl https://$URL/live -s -k | jq -r .status | grep - live
+  dev-integration-testing:
+    name: Dev Integration Testing
+    needs: dev-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test URL Output using Curl and JQ
+        env:
+          URL: ${{needs.dev-deploy.outputs.application-url}}
+        run: |
+          echo $URL
+          echo "-------------------------------------------"
+          curl https://$URL/live -s -k | jq -r .status | grep - live
 
-  # prod-deploy:
-  #   if: github.ref == 'refs/heads/main'
-  #   needs: docker 
-  #   uses: ./.github/workflows/reuse-deployment.yml
-  #   secrets:
-  #     k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
-  #     mongo-password: ${{ secrets.MONGO_PASSWORD}}
-  #   with:
-  #     mongo-url: ${{ vars.MONGO_URI }}
-  #     environment: production
-  #     k8s-manifests-dir: kubernetes/production
+  prod-deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: docker 
+    uses: ./.github/workflows/reuse-deployment.yml
+    secrets:
+      k8s-kubeconfig: ${{ secrets.KUBECONFIG }}
+      mongo-password: ${{ secrets.MONGO_PASSWORD}}
+    with:
+      mongo-url: ${{ vars.MONGO_URI }}
+      environment: production
+      k8s-manifests-dir: kubernetes/production
 
 
-  # prod-integration-testing:
-  #   name: PROD Integration Testing
-  #   needs: prod-deploy
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Test URL Output using Curl and JQ
-  #       env:
-  #         URL: ${{needs.prod-deploy.outputs.application-url}}
-  #       run: |
-  #         echo $URL
-  #         echo "-------------------------------------------"
-  #         curl https://$URL/live -s -k | jq -r .status | grep - live
+  prod-integration-testing:
+    name: PROD Integration Testing
+    needs: prod-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test URL Output using Curl and JQ
+        env:
+          URL: ${{needs.prod-deploy.outputs.application-url}}
+        run: |
+          echo $URL
+          echo "-------------------------------------------"
+          curl https://$URL/live -s -k | jq -r .status | grep - live
 
 
   
